@@ -17,15 +17,26 @@
   var CODE = { ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, ' ': 32, Enter: 13, Escape: 27 };
   var NAMEDCODE = { ' ': 'Space', ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight', Enter: 'Enter' };
 
-  function fireKey(type, key) {
-    var kc = CODE[key] != null ? CODE[key] : (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0);
+  function mkEvent(type, key, kc) {
     var ev;
-    try { ev = new KeyboardEvent(type, { key: key, code: NAMEDCODE[key] || ('Key' + key.toUpperCase()), bubbles: true, cancelable: true }); }
+    try { ev = new KeyboardEvent(type, { key: key, code: NAMEDCODE[key] || ('Key' + key.toUpperCase()), bubbles: true, cancelable: true, view: window }); }
     catch (e) { ev = document.createEvent('Event'); ev.initEvent(type, true, true); ev.key = key; }
-    // many old games read keyCode/which — force them (constructor leaves them 0)
     try { Object.defineProperty(ev, 'keyCode', { get: function () { return kc; } }); } catch (e) {}
     try { Object.defineProperty(ev, 'which', { get: function () { return kc; } }); } catch (e) {}
-    document.dispatchEvent(ev);
+    return ev;
+  }
+  function targets() {
+    // dispatch to document (covers window + body listeners) AND any game canvas /
+    // focused element, since some games bind keys directly to those.
+    var t = [document];
+    var c = document.querySelector('canvas'); if (c) t.push(c);
+    var a = document.activeElement; if (a && a !== document.body && t.indexOf(a) < 0) t.push(a);
+    return t;
+  }
+  function fireKey(type, key) {
+    var kc = CODE[key] != null ? CODE[key] : (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0);
+    targets().forEach(function (tg) { tg.dispatchEvent(mkEvent(type, key, kc)); });
+    if (type === 'keydown' && key.length === 1) targets().forEach(function (tg) { tg.dispatchEvent(mkEvent('keypress', key, kc)); });
   }
 
   var held = {};
